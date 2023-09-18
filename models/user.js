@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { NotFoundError } = require("../expressError");
 const db = require("../db");
 const { BCRYPT_WORK_FACTOR } = require("../config");
+const Message = require("./message");
 
 /** User of the site. */
 
@@ -17,7 +18,7 @@ class User {
   static async register({ username, password, first_name, last_name, phone }) {
     //check for taken username?
 
-    const hashed = bcrypt.hash(password, BCRYPT_WORK_FACTOR)
+    const hashed = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
     const resp = await db.query(
       `INSERT INTO users (username,
                           password,
@@ -42,7 +43,7 @@ class User {
        WHERE username = $1`,
        [username]
     );
-
+      //TODO: What if nothing is returned from the database? return false.
     const storedPassword = resp.rows[0].password;
     const isValid = await bcrypt.compare(password, storedPassword);
     return isValid;
@@ -57,6 +58,7 @@ class User {
       WHERE username = $1`,
       [username]
     );
+    //TODO: Throw error if no user found.
     //Do we return anything?
   }
 
@@ -112,39 +114,33 @@ class User {
    */
 
   static async messagesFrom(username) {
-    const result = await db.query(
-      `SELECT m.id,
-              m.to_user,
-              t.username AS to_username,
-              t.first_name AS to_first_name,
-              t.last_name AS to_last_name,
-              t.phone AS to_phone,
-              m.body,
-              m.sent_at,
-              m.read_at
-         FROM messages AS m
-                JOIN users AS t ON m.to_username = t.username
-         WHERE m.from_username = $1`,
-    [id]);
 
-let m = result.rows;
+    const messageResults = await db.query(
+      `SELECT id
+      FROM messages
+      WHERE from_username = $1`,
+      [username]
+    );
 
-if (!m) throw new NotFoundError(`User: ${username} has no sent messages.`);
+    const messageIds = messageResults.rows.map(message => message.id);
 
-m.map(m => {
-return {
-  id: m.id,
-  to_user: {
-    username: m.to_username,
-    first_name: m.to_first_name,
-    last_name: m.to_last_name,
-    phone: m.to_phone,
-  },
-  body: m.body,
-  sent_at: m.sent_at,
-  read_at: m.read_at,
-};
-  });
+    const messagePromises = messageIds.map(id => Message.get(id));
+
+    const pulledMessages = await Promise.all(messagePromises);
+
+    const trimmedMessages = pulledMessages.map(function(message) {
+
+      const trimmedMessage = {id: message.id,
+                      to_user: message.to_user,
+                      body: message.body,
+                      sent_at: message.sent_at,
+                      read_at: message.read_at};
+      return trimmedMessage;
+    });
+
+    return trimmedMessages;
+  }
+
 
   /** Return messages to this user.
    *
@@ -155,6 +151,30 @@ return {
    */
 
   static async messagesTo(username) {
+    const messageResults = await db.query(
+      `SELECT id
+      FROM messages
+      WHERE to_username = $1`,
+      [username]
+    );
+
+    const messageIds = messageResults.rows.map(message => message.id);
+
+    const messagePromises = messageIds.map(id => Message.get(id));
+
+    const pulledMessages = await Promise.all(messagePromises);
+
+    const trimmedMessages = pulledMessages.map(function(message) {
+
+      const trimmedMessage = {id: message.id,
+                      from_user: message.from_user,
+                      body: message.body,
+                      sent_at: message.sent_at,
+                      read_at: message.read_at};
+      return trimmedMessage;
+    });
+
+    return trimmedMessages;
   }
 }
 
