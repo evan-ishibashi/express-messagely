@@ -112,7 +112,43 @@ class User {
    */
 
   static async messagesFrom(username) {
-  }
+    const result = await db.query(
+      `SELECT m.id,
+              m.to_user,
+              t.username AS to_username,
+              t.first_name AS to_first_name,
+              t.last_name AS to_last_name,
+              t.phone AS to_phone,
+              m.body,
+              m.sent_at,
+              m.read_at
+         FROM messages AS m
+                JOIN users AS t ON m.to_username = t.username
+         WHERE m.from_username = $1`,
+    [id]);
+
+let m = result.rows[0];
+
+if (!m) throw new NotFoundError(`No such message: ${id}`);
+
+return {
+  id: m.id,
+  from_user: {
+    username: m.from_username,
+    first_name: m.from_first_name,
+    last_name: m.from_last_name,
+    phone: m.from_phone,
+  },
+  to_user: {
+    username: m.to_username,
+    first_name: m.to_first_name,
+    last_name: m.to_last_name,
+    phone: m.to_phone,
+  },
+  body: m.body,
+  sent_at: m.sent_at,
+  read_at: m.read_at,
+};
 
   /** Return messages to this user.
    *
