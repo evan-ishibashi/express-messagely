@@ -127,18 +127,13 @@ class User {
          WHERE m.from_username = $1`,
     [id]);
 
-let m = result.rows[0];
+let m = result.rows;
 
-if (!m) throw new NotFoundError(`No such message: ${id}`);
+if (!m) throw new NotFoundError(`User: ${username} has no sent messages.`);
 
+m.map(m => {
 return {
   id: m.id,
-  from_user: {
-    username: m.from_username,
-    first_name: m.from_first_name,
-    last_name: m.from_last_name,
-    phone: m.from_phone,
-  },
   to_user: {
     username: m.to_username,
     first_name: m.to_first_name,
@@ -149,6 +144,7 @@ return {
   sent_at: m.sent_at,
   read_at: m.read_at,
 };
+  });
 
   /** Return messages to this user.
    *
