@@ -4,6 +4,7 @@ const Router = require("express").Router;
 const { UnauthorizedError } = require("../expressError");
 const Message = require("../models/message");
 const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth.js");
+const { ensureBodyExists } = require("../middleware/requestCheck.js");
 const router = new Router();
 
 router.use(ensureLoggedIn);
@@ -21,6 +22,7 @@ router.use(ensureLoggedIn);
  *
  **/
 
+//TODO: Use ensureLoggedIn explicitly in routes. Cut ensureCorrectUser
 router.get("/:id", ensureCorrectUser, async function (req, res) {
   const id = req.params.id;
   const currentUser = res.locals.user;
@@ -40,10 +42,11 @@ router.get("/:id", ensureCorrectUser, async function (req, res) {
  *
  **/
 
-router.post("/", async function (req, res, next) {
+router.post("/", ensureBodyExists, async function (req, res, next) {
   const { to_username, body } = req.body;
   const from_username = res.locals.user.username;
   const newMessage = await Message.create({ from_username, to_username, body });
+
   return res.json({ newMessage });
 });
 
@@ -57,7 +60,7 @@ router.post("/", async function (req, res, next) {
 router.post("/:id/read", async function (req, res, next) {
   const message = await Message.markRead(req.params.id);
   if (message.to_username === currentUser.username) {
-    return res.json();
+    return res.json({ message: {id: message.id, read_at: message.read_at} });
   }
   throw new UnauthorizedError("user not authorized to mark message as read");
 });

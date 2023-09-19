@@ -2,22 +2,18 @@
 
 const { application } = require("express");
 const jwt = require("jsonwebtoken");
-const { BadReqestError, UnauthorizedError } = require("../expressError");
-const db = require("../db");
-const bcrypt = require("bcrypt");
+const { UnauthorizedError } = require("../expressError");
 const { SECRET_KEY } = require("../config");
 const User = require("../models/user");
+const { ensureBodyExists } = require("../middleware/requestCheck.js")
 
 const Router = require("express").Router;
 const router = new Router();
 
 /** POST /login: {username, password} => {token} */
 
-router.post("/login", async function (req, res, next) {
-  if (req.body === undefined) {
-    throw new BadReqestError("Please provide login credentials.");
-  }
-  //Middleware?
+router.post("/login", ensureBodyExists, async function (req, res, next) {
+
 
   const { username, password } = req.body;
 
@@ -37,11 +33,7 @@ router.post("/login", async function (req, res, next) {
  * {username, password, first_name, last_name, phone} => {token}.
  */
 
-router.post("/register", async function (req, res, next) {
-  if (req.body === undefined) {
-    throw new BadReqestError("Please provide login credentials.");
-  }
-  //Middleware?
+router.post("/register", ensureBodyExists, async function (req, res, next) {
 
   const { username,
     password,

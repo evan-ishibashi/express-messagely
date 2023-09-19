@@ -2,7 +2,7 @@
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { NotFoundError, BadRequestError } = require("../expressError");
+const { NotFoundError, BadRequestError, UnauthorizedError } = require("../expressError");
 const db = require("../db");
 const { BCRYPT_WORK_FACTOR } = require("../config");
 const Message = require("./message");
@@ -54,10 +54,10 @@ class User {
       [username]
     );
 
-    const storedPassword = resp.rows[0].password;
+    const storedPassword = resp.rows[0]?.password;
 
     if (!storedPassword) {
-      throw new BadRequestError(`Invalid Credentials`);
+      throw new UnauthorizedError(`Invalid Credentials`);
     }
     else {
 
