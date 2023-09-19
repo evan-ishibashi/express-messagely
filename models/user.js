@@ -17,6 +17,16 @@ class User {
 
   static async register({ username, password, first_name, last_name, phone }) {
     //check for taken username?
+    try {
+      await db.query(
+                `SELECT username
+                FROM users
+                WHERE username = $1`,
+                [username]
+      )
+    } catch (error) {
+
+    }
 
     const hashed = await bcrypt.hash(password, BCRYPT_WORK_FACTOR);
     const resp = await db.query(
@@ -43,7 +53,7 @@ class User {
        WHERE username = $1`,
       [username]
     );
-    //TODO: What if nothing is returned from the database? return false.
+
     const storedPassword = resp.rows[0].password;
 
     if (!storedPassword) {
