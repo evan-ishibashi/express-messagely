@@ -1,8 +1,9 @@
 "use strict";
 
 const Router = require("express").Router;
+const { UnauthorizedError } = require("../expressError");
 const Message = require("../models/message");
-const { ensureLoggedIn, ensureCorrectUser } = requires("../middleware/auth.js");
+const { ensureLoggedIn, ensureCorrectUser } = require("../middleware/auth.js");
 const router = new Router();
 
 router.use(ensureLoggedIn);
@@ -20,11 +21,16 @@ router.use(ensureLoggedIn);
  *
  **/
 
-router.get("/:id", ensureCorrectUser, async function(req, res){
+router.get("/:id", ensureCorrectUser, async function (req, res) {
   const id = req.params.id;
+  const currentUser = res.locals.user;
   const message = await Message.get(id);
-  return res.json({ message });
-})
+  if (message.to_user.username === currentUser.username ||
+    message.from_user.username === currentUser.username) {
+    return res.json({ message });
+  }
+  throw new UnauthorizedError('User not authorized to view message');
+});
 
 
 /** POST / - post message.
@@ -34,7 +40,12 @@ router.get("/:id", ensureCorrectUser, async function(req, res){
  *
  **/
 
-
+router.post("/", async function (req, res, next) {
+  const { to_username, body } = req.body;
+  const from_username = res.locals.user.username;
+  const newMessage = await Message.create({ from_username, to_username, body });
+  return res.json({ newMessage });
+});
 
 /** POST/:id/read - mark message as read:
  *
@@ -43,6 +54,11 @@ router.get("/:id", ensureCorrectUser, async function(req, res){
  * Makes sure that the only the intended recipient can mark as read.
  *
  **/
-
-
+router.post("/:id/read", async function (req, res, next) {
+  const message = await Message.markRead(req.params.id);
+  if (message.to_username === currentUser.username) {
+    return res.json();
+  }
+  throw new UnauthorizedError("user not authorized to mark message as read");
+});
 module.exports = router;
