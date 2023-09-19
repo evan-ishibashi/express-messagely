@@ -1,7 +1,11 @@
 "use strict";
 
 const Router = require("express").Router;
+const Message = require("../models/message");
+const { ensureLoggedIn, ensureCorrectUser } = requires("../middleware/auth.js");
 const router = new Router();
+
+router.use(ensureLoggedIn);
 
 /** GET /:id - get detail of message.
  *
@@ -16,6 +20,12 @@ const router = new Router();
  *
  **/
 
+router.get("/:id", ensureCorrectUser, async function(req, res){
+  const id = req.params.id;
+  const message = await Message.get(id);
+  return res.json({ message });
+})
+
 
 /** POST / - post message.
  *
@@ -23,6 +33,7 @@ const router = new Router();
  *   {message: {id, from_username, to_username, body, sent_at}}
  *
  **/
+
 
 
 /** POST/:id/read - mark message as read:

@@ -21,10 +21,10 @@ router.post("/login", async function (req, res, next) {
 
   const { username, password } = req.body;
 
-  const user = User.authenticate(username, password);
+  const user = await User.authenticate(username, password);
 
   if (user) {
-    User.updateLoginTimestamp(username);
+    await User.updateLoginTimestamp(username);
     const token = jwt.sign({ username }, SECRET_KEY);
     return res.json({ token });
   }
@@ -37,7 +37,7 @@ router.post("/login", async function (req, res, next) {
  * {username, password, first_name, last_name, phone} => {token}.
  */
 
-router.post("/register", function (req, res, next) {
+router.post("/register", async function (req, res, next) {
   if (req.body === undefined) {
     throw new BadReqestError("Please provide login credentials.");
   }
@@ -49,7 +49,7 @@ router.post("/register", function (req, res, next) {
     last_name,
     phone } = req.body;
 
-  User.register({
+  await User.register({
     username,
     password,
     first_name,
@@ -57,7 +57,7 @@ router.post("/register", function (req, res, next) {
     phone
   });
 
-  User.updateLoginTimestamp(username);
+  await User.updateLoginTimestamp(username);
   const token = jwt.sign({ username }, SECRET_KEY);
   return res.json({ token });
 });
