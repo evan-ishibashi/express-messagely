@@ -2,7 +2,7 @@
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { NotFoundError } = require("../expressError");
+const { NotFoundError, BadRequestError } = require("../expressError");
 const db = require("../db");
 const { BCRYPT_WORK_FACTOR } = require("../config");
 const Message = require("./message");
@@ -41,12 +41,21 @@ class User {
       `SELECT password
        FROM users
        WHERE username = $1`,
-       [username]
+      [username]
     );
-      //TODO: What if nothing is returned from the database? return false.
+    //TODO: What if nothing is returned from the database? return false.
     const storedPassword = resp.rows[0].password;
-    const isValid = await bcrypt.compare(password, storedPassword);
-    return isValid;
+
+    if (!storedPassword) {
+      throw new BadRequestError(`Invalid Credentials`);
+    }
+    else {
+
+      const isValid = await bcrypt.compare(password, storedPassword);
+      return isValid;
+
+
+    }
   }
 
   /** Update last_login_at for user */
@@ -55,11 +64,16 @@ class User {
     const resp = await db.query(
       `UPDATE users
       SET last_login_at = current_timestamp
-      WHERE username = $1`,
+      WHERE username = $1
+      RETURNING username`,
       [username]
     );
-    //TODO: Throw error if no user found.
-    //Do we return anything?
+    const user = resp.rows[0];
+
+    if (!user) {
+      throw new NotFoundError(`No user found for username ${username}`);
+    }
+
   }
 
   /** All: basic info on all users:
@@ -114,33 +128,44 @@ class User {
    */
 
   static async messagesFrom(username) {
+    const result = await db.query(
+      `SELECT m.id,
+              m.from_username,
+              m.to_username,
+              t.first_name AS to_first_name,
+              t.last_name AS to_last_name,
+              t.phone AS to_phone,
+              m.body,
+              m.sent_at,
+              m.read_at
+          FROM messages AS m
+          JOIN users AS t ON m.to_username = t.username
+          WHERE m.from_username = $1`,
+          [username]);
 
-    const messageResults = await db.query(
-      `SELECT id
-      FROM messages
-      WHERE from_username = $1`,
-      [username]
+    let m = result.rows;
+
+    if (!m) throw new NotFoundError(`User: ${username} has no sent messages.`);
+
+    const sentMessages = m.map(row =>
+    ({
+      id: row.id,
+      to_user: {
+        username: row.to_username,
+        first_name: row.to_first_name,
+        last_name: row.to_last_name,
+        phone: row.to_phone
+
+      },
+      body: row.body,
+      sent_at:row.sent_at,
+      read_at:row.read_at
+
+    })
     );
 
-    const messageIds = messageResults.rows.map(message => message.id);
-
-    const messagePromises = messageIds.map(id => Message.get(id));
-
-    const pulledMessages = await Promise.all(messagePromises);
-
-    const trimmedMessages = pulledMessages.map(function(message) {
-
-      const trimmedMessage = {id: message.id,
-                      to_user: message.to_user,
-                      body: message.body,
-                      sent_at: message.sent_at,
-                      read_at: message.read_at};
-      return trimmedMessage;
-    });
-
-    return trimmedMessages;
+    return sentMessages;
   }
-
 
   /** Return messages to this user.
    *
@@ -151,30 +176,43 @@ class User {
    */
 
   static async messagesTo(username) {
-    const messageResults = await db.query(
-      `SELECT id
-      FROM messages
-      WHERE to_username = $1`,
-      [username]
+    const result = await db.query(
+      `SELECT m.id,
+              m.from_username,
+              f.first_name AS from_first_name,
+              f.last_name AS from_last_name,
+              f.phone AS from_phone,
+              m.to_username,
+              m.body,
+              m.sent_at,
+              m.read_at
+          FROM messages AS m
+                JOIN users AS f ON m.from_username = f.username
+          WHERE m.to_username = $1`,
+      [username]);
+
+    let m = result.rows;
+
+    if (!m) throw new NotFoundError(
+      `User: ${username} has no received messages.`);
+
+    const recievedMessages = m.map(row =>
+      ({
+        id: row.id,
+        from_user: {
+          username: row.from_username,
+          first_name: row.from_first_name,
+          last_name: row.from_last_name,
+          phone: row.from_phone
+
+        },
+        body: row.body,
+        sent_at:row.sent_at,
+        read_at:row.read_at
+      })
     );
 
-    const messageIds = messageResults.rows.map(message => message.id);
-
-    const messagePromises = messageIds.map(id => Message.get(id));
-
-    const pulledMessages = await Promise.all(messagePromises);
-
-    const trimmedMessages = pulledMessages.map(function(message) {
-
-      const trimmedMessage = {id: message.id,
-                      from_user: message.from_user,
-                      body: message.body,
-                      sent_at: message.sent_at,
-                      read_at: message.read_at};
-      return trimmedMessage;
-    });
-
-    return trimmedMessages;
+    return recievedMessages;
   }
 }
 
